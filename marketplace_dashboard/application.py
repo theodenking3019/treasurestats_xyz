@@ -1,4 +1,5 @@
-# import packages
+# import dependencies
+## dash
 import dash
 from dash import dcc
 from dash import html
@@ -6,112 +7,37 @@ from dash.dependencies import Input, Output, State, MATCH, ALL
 from dash.exceptions import PreventUpdate
 import dash_daq as daq
 import dash_bootstrap_components as dbc
+
+## plotly
 import plotly.express as px
 from plotly.subplots import make_subplots
 import plotly.graph_objects as go
 
-import base64
+## python packages
 import datetime as dt
 import json
+import pandas as pd
 import numpy as np
 import os
-import pandas as pd
 import statsmodels.api as sm
 from sqlalchemy import create_engine
 import re
 
+# ## local packages
+import helper.config as config
+
+# initialize app
 app = dash.Dash(
     __name__, 
-    title='Treasure NFT Sales',
-    meta_tags=[{'name': 'viewport', 'content': 'width=device-width, initial-scale=1.0'}])
-
-app.index_string = """<!DOCTYPE html>
-<html>
-    <head>
-        <!-- Global site tag (gtag.js) - Google Analytics -->
-        <script async src="https://www.googletagmanager.com/gtag/js?id=G-DR5F0RFK4C"></script>
-        <script>
-          window.dataLayer = window.dataLayer || [];
-          function gtag(){dataLayer.push(arguments);}
-          gtag('js', new Date());
-        
-          gtag('config', 'G-DR5F0RFK4C');
-        </script>
-        {%metas%}
-        <title>{%title%}</title>
-        {%favicon%}
-        {%css%}
-    </head>
-    <body>
-        {%app_entry%}
-        <footer>
-            {%config%}
-            {%scripts%}
-            {%renderer%}
-        </footer>
-    </body>
-</html>"""
-
+    title=config.title,
+    meta_tags=config.meta_tags
+    )
+app.index_string = config.html_header
 application = app.server
 
-plot_color_palette = [
-    '#ff0063',
-    '#8601fe',
-    '#05ff9c',
-    '#fefe00',
-    '#1601ff',
-]
-
-# define user inputs and attributes matching
-attributes_by_collection = {
-    'treasures': ['nft_subcategory'],
-    'smol_brains': ['gender','body','hat','glasses','mouth','clothes', 'is_one_of_one'], 
-    'legacy_legions_genesis': ['nft_subcategory'],
-    'smol_cars': ['background','base_color','spots','tire_color','window_color','tip_color','lights_color','door_color','wheel_color', 'is_one_of_one'],
-    'life': [np.nan],
-    'smol_brains_land': [np.nan],
-    'smol_bodies': ['gender','background', 'body','clothes','feet','hands','head'],
-    'quest_keys': [np.nan],
-    'legacy_legions': ['nft_subcategory'],
-    'extra_life': [np.nan],
-    'smol_brains_pets': [np.nan],
-    'smol_bodies_pets': [np.nan],
-    'legions': [np.nan],
-    'consumables': ['nft_subcategory']
-}
-
-collections = list(attributes_by_collection.keys()) + ['all']
-
-
-date_toggle_options = {
-    '1 day': 1,
-    '7 day': 7,
-    '30 day': 30,
-    'All time': 100000
-}
-
-date_interval_options = {
-    '15 min': '15min',
-    '30 min': '30min',
-    '1 hour': '1h',
-    '6 hour': '6h',
-    '12 hour': '12h',
-    '1 day': '1d'
-}
-
-pricing_unit_options = {
-    'MAGIC': 'sale_amt_magic',
-    'USD': 'sale_amt_usd',
-    'ETH': 'sale_amt_eth'
-}
-
-dropdown_style = {
-    'color':'#FFFFFF',
-    'background-color':'#374251', 
-    'border-color':'rgb(229 231 235)', 
-    'border-radius':'0.375rem',
-    'white-space': 'nowrap'
-}
+# define attributes for dropdown menus
+# TODO: pull this from The Graph
+collections = list(config.collection_attributes.keys()) + ['all']
 
 # connect to database
 def db_connect():
@@ -188,7 +114,7 @@ connection = db_connect()
 marketplace_sales = get_sales('all', 7, 'MAGIC', connection)
 
 attributes_dfs = {}
-for key, value in attributes_by_collection.items():
+for key, value in config.collection_attributes.items():
     if (pd.isnull(value[0])):
         continue
     elif (len(value) > 1):
@@ -224,27 +150,27 @@ app.layout = html.Div([
                     options=[{'label': i.title().replace('_', ' '), 'value': i} for i in collections],
                     value='all',
                     clearable=False,
-                    style=dropdown_style,
+                    style=config.dropdown_style,
                     className='headlineDropdown')], 
                 className='headlineControl'),
             html.Div([
                 html.Div('Display Currency:', className='headlineControlText'),
                 dcc.Dropdown(
                     id='pricing_unit',
-                    options=[{'label': key, 'value': value} for key, value in pricing_unit_options.items()],
+                    options=[{'label': key, 'value': value} for key, value in config.pricing_unit_options.items()],
                     value='sale_amt_magic',
                     clearable=False,
-                    style=dropdown_style,
+                    style=config.dropdown_style,
                     className='headlineDropdown')],
                 className='headlineControl'),
             html.Div([
                 html.Div('Lookback Window:', className='headlineControlText'),
                 dcc.Dropdown(
                     id='time_window',
-                    options=[{'label': key, 'value': value} for key, value in date_toggle_options.items()],
+                    options=[{'label': key, 'value': value} for key, value in config.lookback_window_options.items()],
                     value=7,
                     clearable=False,
-                    style=dropdown_style,
+                    style=config.dropdown_style,
                     className='headlineDropdown')],
                 className='headlineControl')],
                 id='headlineControlContainer'),
@@ -269,10 +195,10 @@ app.layout = html.Div([
         dbc.Col('Frequency:'),
         dbc.Col(dcc.Dropdown(
             id='time_interval',
-            options=[{'label': key, 'value': value} for key, value in date_interval_options.items()],
+            options=[{'label': key, 'value': value} for key, value in config.date_interval_options.items()],
             value='1d',
             clearable=False,
-            style=dropdown_style
+            style=config.dropdown_style
         ))
     ], id='frequencyIntervalContainer'),
     dcc.Graph(id='volume_floor_prices'),
@@ -287,7 +213,7 @@ def display_dropdowns(collection_value, children):
     if collection_value=='all':
         id_columns = [np.nan]
     else:
-        id_columns = attributes_by_collection[collection_value]
+        id_columns = config.collection_attributes[collection_value]
         if 'is_one_of_one' in id_columns:
             id_columns.remove('is_one_of_one')
     children = []
@@ -311,13 +237,13 @@ def display_dropdowns(collection_value, children):
                     options=[{'label': i, 'value': i} for i in list(attributes_df[attribute].unique()) + ['any']],
                     value='any',
                     clearable=False,
-                    style=dropdown_style
+                    style=config.dropdown_style
                 )
             ], className='attributeBox')
             children.append(new_dropdown)
         button = html.Div([
             html.Div('blank', id='buttonLabel'),
-            html.Div(html.Button('Reset',id='attributeResetButton', n_clicks=0, style=dropdown_style))
+            html.Div(html.Button('Reset',id='attributeResetButton', n_clicks=0, style=config.dropdown_style))
         ], id = 'attributeResetContainer')
         children.append(button)
     return children
@@ -359,7 +285,7 @@ def display_output(id):
     State({'type': 'filter_dropdown', 'index': ALL}, 'id'),
 )
 def filter_attributes_gender(filter_value, collection_value, filter_id):
-    if 'gender' not in  attributes_by_collection[collection_value]:
+    if 'gender' not in  config.collection_attributes[collection_value]:
         raise PreventUpdate
     if 'male' in filter_value:
         gender_value = 'male'
@@ -415,7 +341,7 @@ def update_stats(collection_value, value_columns, filter_columns, pricing_unit_v
     if collection_value=='all':
         id_columns = [np.nan]
     else:
-        id_columns = attributes_by_collection[collection_value]
+        id_columns = config.collection_attributes[collection_value]
         marketplace_sales_filtered = marketplace_sales_filtered.loc[marketplace_sales_filtered['nft_collection']==collection_value]
     if len(id_columns) > 1:
         attributes_df = attributes_dfs[collection_value]
@@ -460,7 +386,7 @@ def update_stats(collection_value, value_columns, filter_columns, pricing_unit_v
                      y=pricing_unit_value,
                     #  trendline='ols',
                      custom_data=['nft_collection_formatted', 'nft_id', 'nft_subcategory'],
-                     color_discrete_sequence=plot_color_palette)
+                     color_discrete_sequence=config.plot_color_palette)
     fig1.update_traces(hovertemplate='%{customdata[0]} %{customdata[1]}<br>%{customdata[2]}<br><br>Date: %{x}<br>Sale Amount: %{y}')
 
     # trendline
@@ -479,7 +405,7 @@ def update_stats(collection_value, value_columns, filter_columns, pricing_unit_v
                 y=marketplace_sales_filtered['preds'], 
                 mode='lines', 
                 hoverinfo='skip', 
-                marker={'color':plot_color_palette[0]}, 
+                marker={'color':config.plot_color_palette[0]}, 
                 line = {'shape':'spline', 'smoothing':1.3})
             )
     fig1.update_traces(marker=dict(size=6, line=dict(width=1, color='DarkSlateGrey')))
@@ -512,17 +438,17 @@ def update_stats(collection_value, value_columns, filter_columns, pricing_unit_v
                      name='Average Sale',
                      mode='lines',
                      secondary_y=True,
-                     marker={'color':plot_color_palette[0], 'line':{'width':50}})
+                     marker={'color':config.plot_color_palette[0], 'line':{'width':50}})
     fig2.add_scatter(x=marketplace_sales_agg.index,
                      y=marketplace_sales_agg['min'],
                      name='Minimum Sale',
                      mode='lines',
                      secondary_y=True,
-                     marker={'color':plot_color_palette[2], 'line':{'width':50}})
+                     marker={'color':config.plot_color_palette[2], 'line':{'width':50}})
     fig2.add_bar(x=marketplace_sales_agg.index,
                      y=marketplace_sales_agg['sum'],
                      name='Volume',
-                     marker={'color':plot_color_palette[1], 'line': {'width':1.5, 'color':'DarkSlateGrey'}})
+                     marker={'color':config.plot_color_palette[1], 'line': {'width':1.5, 'color':'DarkSlateGrey'}})
     fig2.update_layout(
         paper_bgcolor='rgba(0,0,0,0)',
         plot_bgcolor='rgba(0,0,0,0)',
