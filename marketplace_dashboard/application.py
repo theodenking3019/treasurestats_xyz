@@ -15,16 +15,14 @@ import plotly.graph_objects as go
 
 ## python packages
 import datetime as dt
-import json
 import pandas as pd
 import numpy as np
-import os
 import statsmodels.api as sm
-from sqlalchemy import create_engine
 import re
 
 # ## local packages
 import helper.config as config
+from helper.functions import db_connect, get_sales, q25, q75
 
 # initialize app
 app = dash.Dash(
@@ -35,83 +33,10 @@ app = dash.Dash(
 app.index_string = config.html_header
 application = app.server
 
-# define attributes for dropdown menus
-# TODO: pull this from The Graph
+# initialize data and dropdown attributes
 collections = list(config.collection_attributes.keys()) + ['all']
-
-# connect to database
-def db_connect():
-    sql_credential = os.path.join("static", "mysql_credential.json")
-    with open(sql_credential) as f:
-        mysql_credentials = json.loads(f.read())
-    engine = create_engine(
-        "mysql+pymysql://{user}:{pw}@{host}/{db}".format(
-        user=mysql_credentials['username'], 
-        pw=mysql_credentials['pw'], 
-        host=mysql_credentials['host'], 
-        db="treasure_test"
-        )
-    )
-    connection = engine.connect()
-    return connection
-
-# define functions
-def q75(x):
-    return np.percentile(x, 75)
-
-def q25(x):
-    return np.percentile(x, 25)
-
-def get_sales(collection, lookback_window, display_currency, connection):
-    # read in sales data
-    min_datetime = dt.datetime.now() - dt.timedelta(days = lookback_window)
-    sales_query  = 'SELECT tx_hash, datetime, sale_amt_magic, nft_collection, nft_id, nft_subcategory, quantity FROM treasure.marketplace_sales WHERE datetime >= %(min_datetime)s'
-    if collection != 'all':
-        sales_query = sales_query + 'AND nft_collection = %(collection)s'
-    marketplace_sales_list = []
-    marketplace_sales_query = connection.execute(sales_query, {'min_datetime': min_datetime, 'collection': collection})
-    for row in marketplace_sales_query:
-        marketplace_sales_list.append(row)
-    marketplace_sales = pd.DataFrame(marketplace_sales_list)
-    if len(marketplace_sales)==0:
-        return pd.DataFrame()
-    marketplace_sales.columns=list(marketplace_sales_query.keys())
-    marketplace_sales['date'] = marketplace_sales['datetime'].dt.date
-
-    # split out multiple-quantity sales into individual rows
-    multi_sales = marketplace_sales.loc[marketplace_sales['quantity']>1].copy()
-    marketplace_sales = marketplace_sales.loc[marketplace_sales['quantity']==1].copy()
-    multi_sales['sale_amt_magic'] = multi_sales['sale_amt_magic'] / multi_sales['quantity']
-    multi_sales = multi_sales.loc[multi_sales.index.repeat(multi_sales['quantity'])].reset_index(drop=True)
-    multi_sales['quantity'] = 1
-    marketplace_sales = pd.concat([marketplace_sales, multi_sales])
-
-    # read in token prices
-    if display_currency != 'MAGIC':
-        prices_query = 'SELECT * FROM treasure.token_prices WHERE datetime >= %(min_datetime)s'
-        token_prices_list = []
-        token_prices_query = connection.execute(prices_query, {'min_datetime': min_datetime})
-        for row in token_prices_query:
-            token_prices_list.append(row)
-        token_prices = pd.DataFrame(token_prices_list)
-        token_prices.columns=list(token_prices_query.keys())
-
-        token_prices['date'] = token_prices['datetime'].dt.date
-        token_prices.rename(columns={'datetime':'token_price_datetime'}, inplace=True)
-
-        marketplace_sales = marketplace_sales.merge(token_prices, how='left', on='date')
-        marketplace_sales['token_price_sale_datetime_diff'] = marketplace_sales['datetime'] - marketplace_sales['token_price_datetime']
-        most_recent_token_prices = marketplace_sales.groupby('tx_hash',as_index=False).agg({'token_price_sale_datetime_diff':'min'})
-        marketplace_sales = marketplace_sales.merge(most_recent_token_prices, how='inner', on=['tx_hash', 'token_price_sale_datetime_diff'])
-        marketplace_sales['sale_amt_usd'] = marketplace_sales['sale_amt_magic'] * marketplace_sales['price_magic_usd']
-        marketplace_sales['sale_amt_eth'] = (marketplace_sales['sale_amt_magic'] * marketplace_sales['price_magic_usd']) / marketplace_sales['price_eth_usd']
-
-    return marketplace_sales
-
-# initialize data and attributes
 connection = db_connect()
-
-marketplace_sales = get_sales('all', 7, 'MAGIC', connection)
+marketplace_sales = get_sales('all', config.DEFAULT_LOOKBACK_WINDOW, 'MAGIC', connection)
 
 attributes_dfs = {}
 for key, value in config.collection_attributes.items():

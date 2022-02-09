@@ -1,5 +1,6 @@
 import numpy as np
 
+DEFAULT_LOOKBACK_WINDOW = 7
 title = "Treasure NFT Sales"
 meta_tags = [{
     'name': 'viewport', 
@@ -66,6 +67,7 @@ pricing_unit_options = {
     'USD': 'sale_amt_usd',
     'ETH': 'sale_amt_eth'
 }
+# TODO: pull this from The Graph
 collection_attributes = {
     'treasures': ['nft_subcategory'],
     'smol_brains': ['gender','body','hat','glasses','mouth','clothes', 'is_one_of_one'], 

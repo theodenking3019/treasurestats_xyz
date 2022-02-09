@@ -1,1 +1,1 @@
-from .dashboardConfig import DashboardConfig
+from .functions import db_connect, q75, q25, get_sales
