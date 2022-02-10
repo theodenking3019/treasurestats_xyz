@@ -263,17 +263,14 @@ def update_stats(collection_value, value_columns, filter_columns, pricing_unit_v
 
 
     if outlier_toggle_value:
-        # use daily IQR
-        outlier_calc = marketplace_sales_filtered.groupby('date', as_index=True).agg({pricing_unit_value:[q25, q75]})
-        outlier_calc.columns = outlier_calc.columns.droplevel(0)
-        outlier_calc = outlier_calc.rename_axis(None, axis=1)
-        outlier_calc['cutoff'] = (outlier_calc['q75'] - outlier_calc['q25']) * 1.5
-        outlier_calc['upper'] = outlier_calc['q75'] + outlier_calc['cutoff']
-        outlier_calc['lower'] = outlier_calc['q25'] - outlier_calc['cutoff']
-
-        marketplace_sales_filtered = marketplace_sales_filtered.merge(outlier_calc, how='inner', on='date')
-        marketplace_sales_filtered = marketplace_sales_filtered.loc[marketplace_sales_filtered[pricing_unit_value] <= marketplace_sales_filtered['upper']]
-        marketplace_sales_filtered = marketplace_sales_filtered.loc[marketplace_sales_filtered[pricing_unit_value] >= marketplace_sales_filtered['lower']]
+        # use IQR on entire chart
+        q3 = q75(marketplace_sales_filtered[pricing_unit_value])
+        q1 = q25(marketplace_sales_filtered[pricing_unit_value])
+        iqr = q3 - q1
+        upper = q3 + iqr
+        lower = q1 - iqr
+        marketplace_sales_filtered = marketplace_sales_filtered.loc[marketplace_sales_filtered[pricing_unit_value] <= upper]
+        marketplace_sales_filtered = marketplace_sales_filtered.loc[marketplace_sales_filtered[pricing_unit_value] >= lower]
         
         new_url = new_url + '&outliers=true'
     else:
