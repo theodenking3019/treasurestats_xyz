@@ -10,12 +10,10 @@ import dash_bootstrap_components as dbc
 ## plotly
 import plotly.express as px
 from plotly.subplots import make_subplots
-import plotly.graph_objects as go
 ## python packages
 import datetime as dt
 import pandas as pd
 import numpy as np
-import statsmodels.api as sm
 import re
 ## local packages
 import helper.config as config
@@ -286,25 +284,6 @@ def update_stats(collection_value, value_columns, filter_columns, pricing_unit_v
                      color_discrete_sequence=config.plot_color_palette)
     fig1.update_traces(hovertemplate='%{customdata[0]} %{customdata[1]}<br>%{customdata[2]}<br><br>Date: %{x}<br>Sale Amount: %{y}')
 
-    # trendline
-    if len(marketplace_sales_filtered) > 1:
-        Y = marketplace_sales_filtered[pricing_unit_value]
-        X = pd.to_datetime(marketplace_sales_filtered['datetime']).map(dt.datetime.toordinal)
-        X = sm.add_constant(X)
-        model = sm.OLS(Y,X)
-        regression = model.fit()
-        marketplace_sales_filtered['preds'] = regression.predict(X)
-        marketplace_sales_filtered.sort_values(by='datetime', inplace=True)
-
-        fig1.add_trace(
-            go.Scatter(
-                x=marketplace_sales_filtered['datetime'], 
-                y=marketplace_sales_filtered['preds'], 
-                mode='lines', 
-                hoverinfo='skip', 
-                marker={'color':config.plot_color_palette[0]}, 
-                line = {'shape':'spline', 'smoothing':1.3})
-            )
     fig1.update_traces(marker=dict(size=6, line=dict(width=1, color='DarkSlateGrey')))
     fig1.update_layout(
         paper_bgcolor='rgba(0,0,0,0)',
