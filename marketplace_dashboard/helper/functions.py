@@ -5,20 +5,15 @@ import numpy as np
 import pandas as pd
 from sqlalchemy import create_engine
 
+USER = os.environ.get('TREASURE_DB_USER')
+PW = os.environ.get('TREASURE_DB_PW')
+HOST = os.environ.get('TREASURE_DB_HOST')
+DB = os.environ.get('TREASURE_DB_PROD')
+
 # connect to database
 def db_connect(func):
     def with_connection_(*args,**kwargs):
-        sql_credential = os.path.join("static", "credentials", "mysql_credential.json")
-        with open(sql_credential) as f:
-            mysql_credentials = json.loads(f.read())
-        engine = create_engine(
-            "mysql+pymysql://{user}:{pw}@{host}/{db}".format(
-            user=mysql_credentials['username'], 
-            pw=mysql_credentials['pw'], 
-            host=mysql_credentials['host'], 
-            db=mysql_credentials['database']
-            )
-        )
+        engine = create_engine(f"mysql+pymysql://{USER}:{PW}@{HOST}/{DB}")
         connection = engine.connect()
         try:
             return_value = func(connection, *args,**kwargs)
