@@ -28,8 +28,9 @@ def q75(x):
 def q25(x):
     return np.percentile(x, 25)
 
-def get_sales(collection, lookback_window, display_currency, connection):
+def get_sales(collection, lookback_window, display_currency):
     # read in sales data
+    connection = db_connect()
     min_datetime = dt.datetime.now() - dt.timedelta(days = lookback_window)
     sales_query  = 'SELECT tx_hash, datetime, sale_amt_magic, nft_collection, nft_id, nft_subcategory, quantity FROM treasure.marketplace_sales WHERE datetime >= %(min_datetime)s'
     if collection != 'all':
@@ -72,4 +73,30 @@ def get_sales(collection, lookback_window, display_currency, connection):
         marketplace_sales['sale_amt_usd'] = marketplace_sales['sale_amt_magic'] * marketplace_sales['price_magic_usd']
         marketplace_sales['sale_amt_eth'] = (marketplace_sales['sale_amt_magic'] * marketplace_sales['price_magic_usd']) / marketplace_sales['price_eth_usd']
 
+        connection.close()
+
     return marketplace_sales
+
+def get_attribute_values(df,attributes):
+    connection = db_connect()
+    attributes_dfs = {}
+    for key, value in attributes.items():
+        if (pd.isnull(value[0])):
+            continue
+        elif (len(value) > 1):
+            tmp_attributes_lst = []
+            tmp_attributes_query = connection.execute('SELECT * FROM treasure.attributes_{}'.format(key))
+            for row in tmp_attributes_query:
+                tmp_attributes_lst.append(row)
+            tmp_attributes = pd.DataFrame(tmp_attributes_lst)
+            tmp_attributes.columns=list(tmp_attributes_query.keys())
+            tmp_attributes = tmp_attributes.loc[:, value + ['id']]
+            attributes_dfs[key] = tmp_attributes
+        else:
+            tmp_attributes = df.loc[df['nft_collection']==key, value + ['nft_id']].drop_duplicates()
+            tmp_attributes.rename(columns={'nft_id':'id'}, inplace=True)
+            attributes_dfs[key] = tmp_attributes
+
+        connection.close()
+
+        return attributes_dfs

@@ -22,7 +22,7 @@ import re
 
 # ## local packages
 import helper.config as config
-from helper.functions import db_connect, get_sales, q25, q75
+from helper.functions import get_sales, q25, q75, get_attribute_values
 
 # initialize app
 app = dash.Dash(
@@ -35,28 +35,8 @@ application = app.server
 
 # initialize data and dropdown attributes
 collections = list(config.collection_attributes.keys()) + ['all']
-connection = db_connect()
-marketplace_sales = get_sales('all', config.DEFAULT_LOOKBACK_WINDOW, 'MAGIC', connection)
-
-attributes_dfs = {}
-for key, value in config.collection_attributes.items():
-    if (pd.isnull(value[0])):
-        continue
-    elif (len(value) > 1):
-        tmp_attributes_lst = []
-        tmp_attributes_query = connection.execute('SELECT * FROM treasure.attributes_{}'.format(key))
-        for row in tmp_attributes_query:
-            tmp_attributes_lst.append(row)
-        tmp_attributes = pd.DataFrame(tmp_attributes_lst)
-        tmp_attributes.columns=list(tmp_attributes_query.keys())
-        tmp_attributes = tmp_attributes.loc[:, value + ['id']]
-        attributes_dfs[key] = tmp_attributes
-    else:
-        tmp_attributes = marketplace_sales.loc[marketplace_sales['nft_collection']==key, value + ['nft_id']].drop_duplicates()
-        tmp_attributes.rename(columns={'nft_id':'id'}, inplace=True)
-        attributes_dfs[key] = tmp_attributes
-
-connection.close()
+marketplace_sales = get_sales('all', config.DEFAULT_LOOKBACK_WINDOW, 'MAGIC')
+attributes_dfs = get_attribute_values(marketplace_sales, config.collection_attributes)
 
 # create app layout
 app.layout = html.Div([
@@ -132,7 +112,7 @@ app.layout = html.Div([
 # function to dynamically update attribute inputs based on the collection
 @app.callback(
     Output('attributeDropdownContainer', 'children'),
-    Input('collection_dropdown', 'value'),
+    Input('collection_dropdown', 'value'), 
     State('attributeDropdownContainer', 'children'))
 def display_dropdowns(collection_value, children):
     if collection_value=='all':
@@ -248,8 +228,6 @@ def filter_attributes_gender(filter_value, collection_value, filter_id):
     Input('time_interval', 'value'),
     )
 def update_stats(collection_value, value_columns, filter_columns, pricing_unit_value, time_window_value, outlier_toggle_value, time_interval_value):
-    connection = db_connect()
-
     pricing_unit_label = 'MAGIC'
     if pricing_unit_value == 'sale_amt_usd':
         pricing_unit_label = 'USD'
@@ -257,7 +235,7 @@ def update_stats(collection_value, value_columns, filter_columns, pricing_unit_v
         pricing_unit_label = 'ETH'
 
     new_url = "/collection={}".format(collection_value)
-    marketplace_sales_filtered = get_sales(collection_value, time_window_value, pricing_unit_label, connection)
+    marketplace_sales_filtered = get_sales(collection_value, time_window_value, pricing_unit_label)
 
     if len(marketplace_sales_filtered)==0:
         marketplace_sales_filtered = marketplace_sales.loc[marketplace_sales['nft_collection']=='000000'] # cruft to allow us to take the column names
@@ -390,8 +368,6 @@ def update_stats(collection_value, value_columns, filter_columns, pricing_unit_v
                      gridcolor='#8292a4')
     fig2['layout']['yaxis2']['showgrid'] = False
     fig2['layout']['yaxis2']['title'] = 'Avg Sale Amount'
-
-    connection.close()
 
     return '{:,.0f}'.format(sales),\
             '{:,.2f}'.format(min_price),\
