@@ -6,20 +6,28 @@ import pandas as pd
 from sqlalchemy import create_engine
 
 # connect to database
-def db_connect():
-    sql_credential = os.path.join("static", "credentials", "mysql_credential.json")
-    with open(sql_credential) as f:
-        mysql_credentials = json.loads(f.read())
-    engine = create_engine(
-        "mysql+pymysql://{user}:{pw}@{host}/{db}".format(
-        user=mysql_credentials['username'], 
-        pw=mysql_credentials['pw'], 
-        host=mysql_credentials['host'], 
-        db=mysql_credentials['database']
+def db_connect(func):
+    def with_connection_(*args,**kwargs):
+        sql_credential = os.path.join("static", "credentials", "mysql_credential.json")
+        with open(sql_credential) as f:
+            mysql_credentials = json.loads(f.read())
+        engine = create_engine(
+            "mysql+pymysql://{user}:{pw}@{host}/{db}".format(
+            user=mysql_credentials['username'], 
+            pw=mysql_credentials['pw'], 
+            host=mysql_credentials['host'], 
+            db=mysql_credentials['database']
+            )
         )
-    )
-    connection = engine.connect()
-    return connection
+        connection = engine.connect()
+        try:
+            return_value = func(connection, *args,**kwargs)
+        except:
+            raise Exception("Error connecting to database!")
+        finally:
+            connection.close()
+        return return_value
+    return with_connection_
 
 # define functions
 def q75(x):
@@ -28,9 +36,9 @@ def q75(x):
 def q25(x):
     return np.percentile(x, 25)
 
-def get_sales(collection, lookback_window, display_currency):
+@db_connect
+def get_sales(connection, collection, lookback_window, display_currency):
     # read in sales data
-    connection = db_connect()
     min_datetime = dt.datetime.now() - dt.timedelta(days = lookback_window)
     sales_query  = 'SELECT tx_hash, datetime, sale_amt_magic, nft_collection, nft_id, nft_subcategory, quantity FROM treasure.marketplace_sales WHERE datetime >= %(min_datetime)s'
     if collection != 'all':
@@ -73,19 +81,17 @@ def get_sales(collection, lookback_window, display_currency):
         marketplace_sales['sale_amt_usd'] = marketplace_sales['sale_amt_magic'] * marketplace_sales['price_magic_usd']
         marketplace_sales['sale_amt_eth'] = (marketplace_sales['sale_amt_magic'] * marketplace_sales['price_magic_usd']) / marketplace_sales['price_eth_usd']
 
-        connection.close()
-
     return marketplace_sales
 
-def get_attribute_values(df,attributes):
-    connection = db_connect()
+@db_connect
+def get_attribute_values(connection, df, attributes):
     attributes_dfs = {}
     for key, value in attributes.items():
         if (pd.isnull(value[0])):
             continue
         elif (len(value) > 1):
             tmp_attributes_lst = []
-            tmp_attributes_query = connection.execute('SELECT * FROM treasure.attributes_{}'.format(key))
+            tmp_attributes_query = connection.execute(f'SELECT * FROM treasure.attributes_{key}')
             for row in tmp_attributes_query:
                 tmp_attributes_lst.append(row)
             tmp_attributes = pd.DataFrame(tmp_attributes_lst)
@@ -96,7 +102,5 @@ def get_attribute_values(df,attributes):
             tmp_attributes = df.loc[df['nft_collection']==key, value + ['nft_id']].drop_duplicates()
             tmp_attributes.rename(columns={'nft_id':'id'}, inplace=True)
             attributes_dfs[key] = tmp_attributes
-
-        connection.close()
 
         return attributes_dfs
