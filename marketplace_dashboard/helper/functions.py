@@ -1,5 +1,4 @@
 import datetime as dt
-import json
 import os
 import numpy as np
 import pandas as pd
@@ -86,16 +85,16 @@ def get_attribute_values(connection, df, attributes):
             continue
         elif (len(value) > 1):
             tmp_attributes_lst = []
-            tmp_attributes_query = connection.execute(f'SELECT * FROM treasure.attributes_{key}')
+            tmp_attributes_query = connection.execute(f"SELECT * FROM treasure.attributes_{key}")
             for row in tmp_attributes_query:
                 tmp_attributes_lst.append(row)
             tmp_attributes = pd.DataFrame(tmp_attributes_lst)
             tmp_attributes.columns=list(tmp_attributes_query.keys())
-            tmp_attributes = tmp_attributes.loc[:, value + ['id']]
+            tmp_attributes = tmp_attributes.loc[:, value + ["id"]]
             attributes_dfs[key] = tmp_attributes
         else:
-            tmp_attributes = df.loc[df['nft_collection']==key, value + ['nft_id']].drop_duplicates()
-            tmp_attributes.rename(columns={'nft_id':'id'}, inplace=True)
+            tmp_attributes = df.loc[df["nft_collection"]==key, value + ["nft_id"]].drop_duplicates()
+            tmp_attributes.rename(columns={"nft_id":"id"}, inplace=True)
             attributes_dfs[key] = tmp_attributes
 
-        return attributes_dfs
+    return attributes_dfs

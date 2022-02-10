@@ -7,22 +7,24 @@ from dash.dependencies import Input, Output, State, MATCH, ALL
 from dash.exceptions import PreventUpdate
 import dash_daq as daq
 import dash_bootstrap_components as dbc
-
 ## plotly
 import plotly.express as px
 from plotly.subplots import make_subplots
 import plotly.graph_objects as go
-
 ## python packages
 import datetime as dt
 import pandas as pd
 import numpy as np
 import statsmodels.api as sm
 import re
-
-# ## local packages
+## local packages
 import helper.config as config
 from helper.functions import get_sales, q25, q75, get_attribute_values
+
+# initialize data and dropdown attributes
+collections = list(config.collection_attributes.keys()) + ['all']
+marketplace_sales = get_sales('all', config.DEFAULT_LOOKBACK_WINDOW, 'MAGIC')
+attributes_dfs = get_attribute_values(marketplace_sales, config.collection_attributes)
 
 # initialize app
 app = dash.Dash(
@@ -32,11 +34,6 @@ app = dash.Dash(
     )
 app.index_string = config.html_header
 application = app.server
-
-# initialize data and dropdown attributes
-collections = list(config.collection_attributes.keys()) + ['all']
-marketplace_sales = get_sales('all', config.DEFAULT_LOOKBACK_WINDOW, 'MAGIC')
-attributes_dfs = get_attribute_values(marketplace_sales, config.collection_attributes)
 
 # create app layout
 app.layout = html.Div([
