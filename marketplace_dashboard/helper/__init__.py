@@ -1,1 +1,1 @@
-from .functions import db_connect, q75, q25, get_sales
+from .functions import db_connect, q75, q25, get_sales, get_attribute_values
